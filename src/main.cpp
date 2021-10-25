@@ -237,6 +237,8 @@ void onExitConfigMode() {
   isInConfigMode = false;
   stopFlash();
 
+  led.setColor(RGBLed::WHITE);
+  delay(500);
   onCupUp();
 }
 
@@ -281,10 +283,10 @@ void onSingleClick(void* param) {
 
 
 void setup() {
-  //TODO: get current timer from eeprom
+  // Serial.begin(9600);
+
   currentTimerSetting = EEPROM.read(EEPROM_ADDRESS);
   
-  Serial.begin(9600);
   button.setLongPressCallback(onLongPress);
   button.setReleasedCallback(onReleased);
   button.setDoubleClickCallback(onDoubleClick);
