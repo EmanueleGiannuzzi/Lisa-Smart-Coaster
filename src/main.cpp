@@ -26,8 +26,8 @@
 const int DEFAULT_OFF_COLOR[3] = {0, 0, 0};
 
 const int timerSettingsSize = 6;
-unsigned int currentTimerSetting = DEFAULT_TIMER_SETTING;
-unsigned int timerSettings[] = {15, 30, 45, 60, 90, 120};
+int currentTimerSetting = DEFAULT_TIMER_SETTING;
+int timerSettings[] = {15, 30, 45, 60, 90, 120};
 
 RGBLed led(RED_PIN, GREEN_PIN, BLUE_PIN, RGBLed::COMMON_CATHODE);
 Switch button = Switch(BUTTON_PIN);
@@ -47,27 +47,16 @@ unsigned int patternSize = 0;
 unsigned int currentOnOff = 0;
 
 void flashTick(){
-  
-  // for(int i = 0; i < patternSize; ++i) {
-  //   Serial.print(onOffPattern[i]);
-  //   Serial.print(" ");
-  // }
-  // Serial.println();
-
   bool flashOn = onOffPattern[currentOnOff];
   if(flashOn) {
-    Serial.println("ON");
     led.setColor(flashOnRed, flashOnGreen, flashOnBlue);
   }
   else {
-    Serial.println("OFF");
     led.setColor(flashOffRed, flashOffGreen, flashOffBlue);
   }
   currentOnOff++;
   if(currentOnOff >= patternSize) {
     currentOnOff = 0;
-    
-    Serial.println("NEXT");
   }
 }
 
@@ -88,15 +77,11 @@ void startFlash(bool* pattern, int _patternSize, const int onColor[3], const int
   flashOffGreen = offColor[1];
   flashOffBlue = offColor[2];
 
-  memcpy(onOffPattern, pattern, patternSize);
+  delete onOffPattern;
+  onOffPattern = new boolean[_patternSize];
+  memcpy(onOffPattern, pattern, _patternSize);
   
   patternSize = _patternSize;
-
-  for(int i = 0; i < patternSize; ++i) {
-    Serial.print(onOffPattern[i]);
-    Serial.print(" ");
-  }
-  Serial.println();
 
   flashTicker.start();
 }
@@ -209,25 +194,27 @@ void onCupDown() {
 }
 
 void flashSetting() {
-  unsigned int currentSetting = currentTimerSetting + 1;
-  static const int pauseSize = 6; 
+  int currentSetting = currentTimerSetting + 1;
+  static const int pauseSize = 4; 
   static const int onColor[3] = {0, 255, 0};
 
-  unsigned int size = (currentSetting * 2) + pauseSize;
-  bool pattern[size];
-  unsigned int i;
-  for(i = 0; i < (currentSetting * 2); i+=2) {
+  int size = (currentSetting * 2) + pauseSize;
+  bool* pattern = new bool[size];
+  for(int i = 0; i < (currentSetting * 2); i+=2) {
     pattern[i] = false;
     pattern[i+1] = true;
   }
-  for( ; i < size; ++i) {
+
+  for(int i = (currentSetting * 2); i < size; ++i) {
     pattern[i] = false;
   }
 
   startFlash(pattern, size, onColor);
+  delete pattern;
 }
 
 void onEnterConfigMode() {
+
   Serial.println("Config mode");
   isInConfigMode = true;
 
@@ -278,7 +265,7 @@ void onReleased(void* param) {
 }
 
 void onDoubleClick(void* param) {
-  if(!isCupDown) {
+  if(!isCupDown && !isInConfigMode) {
     onEnterConfigMode();
   }
 }
