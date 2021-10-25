@@ -1,8 +1,11 @@
 #include <Arduino.h>
 
+#include <EEPROM.h>
 #include <Ticker.h>
 #include <RGBLed.h>
 #include <avdweb_Switch.h>
+
+#define EEPROM_ADDRESS 0
 
 #define RED_PIN 11
 #define GREEN_PIN 10
@@ -12,16 +15,16 @@
 
 #define FLASH_RATE 500 //on/off each FLASH_RATE millisecond
 
-#define TIME_DIVIDER 60 //Debug purpose
+#define TIME_DIVIDER 1 //Debug purpose
 #define STEP_PER_SEC 1
 
-#define COLOR_UPDATE_FREQ 500 //millis
+#define COLOR_UPDATE_FREQ 50 //millis
 
 #define DEFAULT_TIMER_SETTING 0
 
 #define CUP_UP_DELAY 1000
 
-#define TURN_OFF_DELAY 15 // seconds
+#define TURN_OFF_DELAY 120 // seconds
 
 const int DEFAULT_OFF_COLOR[3] = {0, 0, 0};
 
@@ -169,7 +172,6 @@ void startLedTimer() {
 
   delete turnOffTicker;
   uint32_t offTime = (((timerSettings[currentTimerSetting] * 60) / TIME_DIVIDER) + TURN_OFF_DELAY) * 1000L;
-  Serial.println(offTime);
   turnOffTicker = new Ticker(turnOff, offTime, 1, MILLIS);
   turnOffTicker->start();
 }
@@ -215,7 +217,8 @@ void flashSetting() {
 
 void onEnterConfigMode() {
 
-  Serial.println("Config mode");
+  Serial.print("Config mode ");
+  Serial.println(currentTimerSetting + 1);
   isInConfigMode = true;
 
   isCupDown = false;
@@ -230,7 +233,7 @@ void onEnterConfigMode() {
 }
 
 void onExitConfigMode() {
-  //TODO: save currentTimerSetting to eeprom
+  EEPROM.write(EEPROM_ADDRESS, currentTimerSetting);
   isInConfigMode = false;
   stopFlash();
 
@@ -246,7 +249,7 @@ void onNextTimerSelection() {
   flashSetting();
 
   Serial.print("Current timer selection ");
-  Serial.println(currentTimerSetting);
+  Serial.println(currentTimerSetting + 1);
 }
 
 void onLongPress(void* param) {
@@ -279,6 +282,7 @@ void onSingleClick(void* param) {
 
 void setup() {
   //TODO: get current timer from eeprom
+  currentTimerSetting = EEPROM.read(EEPROM_ADDRESS);
   
   Serial.begin(9600);
   button.setLongPressCallback(onLongPress);
