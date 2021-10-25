@@ -237,8 +237,11 @@ void onExitConfigMode() {
   isInConfigMode = false;
   stopFlash();
 
-  led.setColor(RGBLed::WHITE);
-  delay(500);
+  led.setColor(RGBLed::RED);
+  delay(400);
+  led.setColor(RGBLed::GREEN);
+  delay(400);
+
   onCupUp();
 }
 
