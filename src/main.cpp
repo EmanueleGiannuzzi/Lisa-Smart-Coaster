@@ -10,80 +10,122 @@
 
 #define BUTTON_PIN 6
 
-#define FLASH_RATE 1000 //on/off each FLASH_RATE millisecond
+#define FLASH_RATE 500 //on/off each FLASH_RATE millisecond
+
+#define TIME_DIVIDER 60 //Debug purpose
+#define STEP_PER_SEC 1
+
+#define COLOR_UPDATE_FREQ 500 //millis
+
+#define DEFAULT_TIMER_SETTING 0
+
+#define CUP_UP_DELAY 1000
+
+#define TURN_OFF_DELAY 15 // seconds
+
+const int DEFAULT_OFF_COLOR[3] = {0, 0, 0};
+
+const int timerSettingsSize = 6;
+unsigned int currentTimerSetting = DEFAULT_TIMER_SETTING;
+unsigned int timerSettings[] = {15, 30, 45, 60, 90, 120};
 
 RGBLed led(RED_PIN, GREEN_PIN, BLUE_PIN, RGBLed::COMMON_CATHODE);
 Switch button = Switch(BUTTON_PIN);
 
+#pragma region FlashTicker
 
-Ticker* led_ticker;
+int flashOnRed = 0;
+int flashOnGreen = 0;
+int flashOnBlue = 0;
 
-class FlashTicker {
-  int red = 0;
-  int green = 0;
-  int blue = 0;
+int flashOffRed = 0;
+int flashOffGreen = 0;
+int flashOffBlue = 0;
 
-  bool flashOn = false;
+bool* onOffPattern;
+unsigned int patternSize = 0;
+unsigned int currentOnOff = 0;
 
-  Ticker* ticker;
-  public:
-  // FlashTicker() : ticker{[this](){this->tick();}, FLASH_RATE, 0, MILLIS} {
-  //   // ticker.start();
-  // }
-
-  FlashTicker() {
-    ticker = new Ticker([this](){this->tick();}, 1000, 0, MILLIS);
-  }
-
-  void start() {
-    ticker->start();
-  }
-
-  void stop() {
-    ticker->stop();
-  }
+void flashTick(){
   
-  void tick() {
-    redFlashOn = !redFlashOn;
-    if(redFlashOn) {
-      led.setColor(red ? 255 : 0, green ? 255 : 0, blue ? 255 : 0);
-    }
-    else {
-    led.setColor(0, 0, 0);
-    }
+  // for(int i = 0; i < patternSize; ++i) {
+  //   Serial.print(onOffPattern[i]);
+  //   Serial.print(" ");
+  // }
+  // Serial.println();
+
+  bool flashOn = onOffPattern[currentOnOff];
+  if(flashOn) {
+    Serial.println("ON");
+    led.setColor(flashOnRed, flashOnGreen, flashOnBlue);
   }
-};
-FlashTicker flashTicker;
+  else {
+    Serial.println("OFF");
+    led.setColor(flashOffRed, flashOffGreen, flashOffBlue);
+  }
+  currentOnOff++;
+  if(currentOnOff >= patternSize) {
+    currentOnOff = 0;
+    
+    Serial.println("NEXT");
+  }
+}
+
+Ticker flashTicker(flashTick, FLASH_RATE, 0, MILLIS);
+int defafultOff[3] = {0,0,0};
+
+void stopFlash() {
+  flashTicker.stop();
+}
+
+void startFlash(bool* pattern, int _patternSize, const int onColor[3], const int offColor[3] = defafultOff) {
+  stopFlash();
+  flashOnRed = onColor[0];
+  flashOnGreen = onColor[1];
+  flashOnBlue = onColor[2];
+
+  flashOffRed = offColor[0];
+  flashOffGreen = offColor[1];
+  flashOffBlue = offColor[2];
+
+  memcpy(onOffPattern, pattern, patternSize);
+  
+  patternSize = _patternSize;
+
+  for(int i = 0; i < patternSize; ++i) {
+    Serial.print(onOffPattern[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  flashTicker.start();
+}
+
+#pragma endregion
+
 
 bool isCupDown = false;
 bool isInConfigMode = false;
 
-const int defaultTimerSetting = 1;
-const int timerSettingsSize = 6;
-int currentTimerSetting = defaultTimerSetting;
-int timerSettings[] = {15, 30, 45, 60, 90, 120};
-
-int color_stage = 0;//0 = blue; 1 = blue->purple; 2 = purple->red; 3 = red flashing
+int colorStage = 0;//0 = blue; 1 = blue->purple; 2 = purple->red; 3 = red; 4 = red flashing
+float currentStageProgress = 0;
+int steps = 0;
 
 void ledLoop() {
-  static const int steps = 100;//TODO
-
   static int red = 0;
   static int green = 0;
   static int blue = 0;
-  static float currentStageProgress = 0;
 
   static unsigned long lastMillis = millis();
-
   static bool flashOn = false;
 
-  switch (color_stage) {
-    case 0:
+  switch (colorStage) {
+    case 0://blue
       blue = 255;
       green = 0;
       red = 0;
       break;
-    case 1:
+    case 1://blue->purple
       blue = 255;
       green = 0;
       red = currentStageProgress * 255;
@@ -93,7 +135,12 @@ void ledLoop() {
       green = 0;
       red = 255;
       break;
-    case 3://red flashing
+    case 3://red
+      blue = 0;
+      green = 0;
+      red = 255;
+      break;
+    case 4://red flashing
       blue = 0;
       green = 0;
       if(millis() - lastMillis > FLASH_RATE) {
@@ -102,24 +149,15 @@ void ledLoop() {
       }
       red = flashOn ? 255 : 0;
       break;
-    case 4://green flashing
-      blue = 0;//TODO: Flash x times
-      if(millis() - lastMillis > FLASH_RATE) {
-        lastMillis = millis();
-        flashOn = !flashOn;
-      }
-      green = flashOn ? 255 : 0;
-      red = 0;
-      break;
     default:
       break;
   }
 
-  currentStageProgress += (1.0f / steps);//TODO
+  currentStageProgress += 1.0f / steps;
   
-  if(currentStageProgress == 1.0f) {
-    if(color_stage < 3) {
-      color_stage++;
+  if(currentStageProgress >= 1.0f) {
+    if(colorStage < 4) {
+      colorStage++;
     }
     currentStageProgress = 0.0f;
   }
@@ -127,32 +165,89 @@ void ledLoop() {
   led.setColor(red, green, blue);
 }
 
-void startTimer(uint32_t millis) {
-  if(led_ticker != nullptr) {
-    led_ticker->stop();
-    delete led_ticker;
-  }
+Ticker ledTicker(ledLoop, COLOR_UPDATE_FREQ, 0, MILLIS);
 
-  led_ticker = new Ticker(ledLoop, millis, 0, MILLIS);
+void turnOff() {
+  Serial.println("OFF");
+  ledTicker.stop();
+  led.off();
 }
+Ticker* turnOffTicker;
 
-void onCupDown() {
-  Serial.println("Cup down");
-  isCupDown = true;
+void startLedTimer() {
+  currentStageProgress = 0;
+  colorStage = 0;
+
+  ledTicker.stop();
+  steps = ((1000 / COLOR_UPDATE_FREQ) * timerSettings[currentTimerSetting] * 60) / 4 / TIME_DIVIDER;
+  ledTicker.start();
+
+  delete turnOffTicker;
+  uint32_t offTime = (((timerSettings[currentTimerSetting] * 60) / TIME_DIVIDER) + TURN_OFF_DELAY) * 1000L;
+  Serial.println(offTime);
+  turnOffTicker = new Ticker(turnOff, offTime, 1, MILLIS);
+  turnOffTicker->start();
 }
 
 void onCupUp() {
+  turnOffTicker->stop();
   Serial.println("Cup up");
   isCupDown = false;
+
+  ledTicker.stop();
+  led.setColor(DEFAULT_OFF_COLOR[0], DEFAULT_OFF_COLOR[1], DEFAULT_OFF_COLOR[2]);
+}
+
+Ticker cupUpTicker(onCupUp, CUP_UP_DELAY, 1, MILLIS);
+
+void onCupDown() {
+  led.setColor(RGBLed::BLUE);
+  Serial.println("Cup down");
+  isCupDown = true;
+  cupUpTicker.stop();
+  startLedTimer();
+}
+
+void flashSetting() {
+  unsigned int currentSetting = currentTimerSetting + 1;
+  static const int pauseSize = 6; 
+  static const int onColor[3] = {0, 255, 0};
+
+  unsigned int size = (currentSetting * 2) + pauseSize;
+  bool pattern[size];
+  unsigned int i;
+  for(i = 0; i < (currentSetting * 2); i+=2) {
+    pattern[i] = false;
+    pattern[i+1] = true;
+  }
+  for( ; i < size; ++i) {
+    pattern[i] = false;
+  }
+
+  startFlash(pattern, size, onColor);
 }
 
 void onEnterConfigMode() {
   Serial.println("Config mode");
   isInConfigMode = true;
+
+  isCupDown = false;
+  ledTicker.stop();
+  cupUpTicker.stop();
+  if(turnOffTicker != nullptr) {
+    turnOffTicker->stop();
+  }
+  led.off();
+
+  flashSetting();
 }
 
 void onExitConfigMode() {
+  //TODO: save currentTimerSetting to eeprom
   isInConfigMode = false;
+  stopFlash();
+
+  onCupUp();
 }
 
 void onNextTimerSelection() {
@@ -161,7 +256,7 @@ void onNextTimerSelection() {
     currentTimerSetting = 0;
   }
 
-  //TODO: save to eeprom
+  flashSetting();
 
   Serial.print("Current timer selection ");
   Serial.println(currentTimerSetting);
@@ -177,17 +272,15 @@ void onLongPress(void* param) {
 }
 
 void onReleased(void* param) {
-  if(!isInConfigMode) {
-    if(isCupDown) {
-      onCupUp();
-    }
+  if(!isInConfigMode && isCupDown) {
+    cupUpTicker.start();
   }
 }
 
 void onDoubleClick(void* param) {
-    if(!isCupDown) {
-      onEnterConfigMode();
-    }
+  if(!isCupDown) {
+    onEnterConfigMode();
+  }
 }
 
 void onSingleClick(void* param) {
@@ -205,13 +298,18 @@ void setup() {
   button.setReleasedCallback(onReleased);
   button.setDoubleClickCallback(onDoubleClick);
   button.setSingleClickCallback(onSingleClick);
+
+  led.setColor(DEFAULT_OFF_COLOR[0], DEFAULT_OFF_COLOR[1], DEFAULT_OFF_COLOR[2]);
 }
 
 
 void loop() {
   button.poll();
-  if(led_ticker != nullptr) {
-    led_ticker->update();
-  }
 
+  ledTicker.update();
+  cupUpTicker.update();
+  flashTicker.update();
+  if(turnOffTicker != nullptr) {
+    turnOffTicker->update();
+  }
 }
