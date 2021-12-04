@@ -5,13 +5,13 @@
 #include <avdweb_Switch.h>
 #include <Adafruit_NeoPixel.h>
 
-#define TIME_DIVIDER 60 //Debug purpose
+#define TIME_DIVIDER 1 //Debug purpose
 
 #define BUTTON_PIN 6
 #define PIXELS_PIN 3
 #define NUMPIXELS 8
 
-#define BRIGHTNESS 150 //0-255
+#define BRIGHTNESS 60 //0-255
 #define TURN_OFF_DELAY 120 // seconds
 
 #define DEFAULT_TIMER_SETTING 0
